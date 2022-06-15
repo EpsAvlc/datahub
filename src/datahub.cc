@@ -7,7 +7,7 @@
 
 namespace datahub {
 
-DataBuffer::DataBuffer() {
+DataBuffer::DataBuffer() : send_report_(false) {
   prune_buffs_thread_ = std::thread(&DataBuffer::pruneBuffs, this);
   running_ = true;
 }
@@ -83,10 +83,21 @@ bool DataBuffer::getMessageId(const std::string& message_name,
 
 void DataBuffer::pruneBuffs() {
   while (running_) {
+    if (send_report_) {
+      for (size_t mi = 0; mi < message_buffs_.size(); ++mi) {
+        ROS_INFO_STREAM(message_infos_[mi].name
+                        << ": restrict size  " << message_infos_[mi].buff_size
+                        << ", real size  " << message_buffs_[mi].size());
+      }
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     WriterLockGuard lock(mutex_);
     for (int mi = 0; mi < message_buffs_.size(); ++mi) {
-      if (message_infos_[mi].buff_size < message_buffs_.size()) {
+      // ROS_INFO_STREAM("Enter msg for: " << message_infos_[mi].name
+                                        // << " restrict: "
+                                        // << message_infos_[mi].buff_size
+                                        // << " real: " << message_buffs_.size());
+      if (message_infos_[mi].buff_size < message_buffs_[mi].size()) {
         std::string message_name = message_infos_[mi].name;
         auto new_begin_iter = message_buffs_[mi].begin();
         std::advance(new_begin_iter,
@@ -98,7 +109,7 @@ void DataBuffer::pruneBuffs() {
             continue;
           }
           if ((*data_syncers_[si]->message_iters_[syncer_message_id])
-                  ->header.timestamp > (*new_begin_iter)->header.timestamp) {
+                  ->header.timestamp < (*new_begin_iter)->header.timestamp) {
             continue;
           }
           data_syncers_[si]->message_iters_[syncer_message_id] = new_begin_iter;
@@ -239,7 +250,7 @@ bool DataSyncer::getSyncMessages(
       std::vector<Message::Ptr> before_msgs;
       DataBuffer::IteratorType ret_iter = buffer_->getMessagesBefore(
           search_begin_it, search_end_it, pivot_timestamp, &before_msgs);
-      if (ret_iter == search_end_it) {
+      if (ret_iter == search_end_it || before_msgs.size() == 0) {
         return false;
       }
       new_iters[mi] = ret_iter;
@@ -268,7 +279,7 @@ bool DataSyncer::getMessageId(const std::string& message_name,
   }
 }
 
-void DataSyncer::registerCallback(const NalioCallback& cb) {
+void DataSyncer::registerCallback(const DatahubCallback& cb) {
   callbacks_.emplace_back(cb);
 }
 
@@ -285,9 +296,6 @@ void DataSyncer::syncThread() {
       sync_cv_.wait(lock);
       // std::this_thread::yield();
     }
-    ROS_INFO_STREAM_FUNC(
-        "Get a sync message pack."
-        << std::dynamic_pointer_cast<PointCloudData>(msgs[0][0]->data)->point_cloud.get());
     for (size_t ci = 0; ci < callbacks_.size(); ++ci) {
       callbacks_[ci](msgs);
     }
@@ -328,6 +336,9 @@ DataBuffer::IteratorType DataBuffer::getMessagesBefore(
   before_msgs->clear();
   IteratorType ret = iter_end;
   for (auto iter = iter_begin; iter != iter_end; ++iter) {
+    if ((*iter)->header.timestamp < 0) {
+      continue;
+    }
     if ((*iter)->header.timestamp < tr) {
       before_msgs->push_back(*iter);
       ret = iter;

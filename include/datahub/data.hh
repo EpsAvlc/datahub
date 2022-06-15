@@ -30,6 +30,7 @@ struct Data {
 };
 
 struct IMUData : public Data {
+  using Ptr = std::shared_ptr<IMUData>;
   //* angular velocity;
   Eigen::Vector3d w;
   //* linear velocity;

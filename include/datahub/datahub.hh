@@ -13,7 +13,7 @@
 
 namespace datahub {
 
-using NalioCallback =
+using DatahubCallback =
     std::function<void(const std::vector<std::vector<Message::Ptr>>&)>;
 class DataBuffer;
 
@@ -39,7 +39,7 @@ class DataSyncer {
 
   bool getMessageId(const std::string& message_name, uint16_t* message_id);
 
-  void registerCallback(const NalioCallback& cb);
+  void registerCallback(const DatahubCallback& cb);
 
   void syncThread();
 
@@ -51,7 +51,7 @@ class DataSyncer {
     std::string name;
   };
 
-  std::vector<NalioCallback> callbacks_;
+  std::vector<DatahubCallback> callbacks_;
 
   DataBuffer* buffer_;
   std::map<std::string, uint16_t> message_ids_;
@@ -78,7 +78,9 @@ class DataBuffer {
 
   void registerMessage(const std::string& message_name,
                        const size_t buffer_size);
+
   void receiveMessage(const Message::Ptr& message);
+
 
   bool getMessageId(const std::string& message_name, uint16_t* message_id);
 
@@ -109,6 +111,7 @@ class DataBuffer {
   std::thread prune_buffs_thread_;
   ReadWriteMutex mutex_;
   bool running_;
+  bool send_report_;
 };
 
 }  // namespace datahub

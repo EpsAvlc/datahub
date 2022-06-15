@@ -3,11 +3,9 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 namespace datahub {
-datahub::Header toNalioHeader(const std_msgs::Header& ros_header) {
-  datahub::Header nalio_header;
-  nalio_header.frame_id = ros_header.frame_id;
-  nalio_header.timestamp = ros_header.stamp.toNSec() / 1000;
-  return nalio_header;
+void toDatahubHeader(const std_msgs::Header& ros_header, datahub::Header *std_header) {
+  std_header->frame_id = ros_header.frame_id;
+  std_header->timestamp = ros_header.stamp.toNSec() / 1000;
 }
 
 std::shared_ptr<datahub::Message> toNalioMessage(
@@ -21,7 +19,7 @@ std::shared_ptr<datahub::Message> toNalioMessage(
   imu_data->a.y() = imu_msg->linear_acceleration.y;
   imu_data->a.z() = imu_msg->linear_acceleration.z;
   ret->data = imu_data;
-  ret->header = toNalioHeader(imu_msg->header);
+  toDatahubHeader(imu_msg->header, &ret->header);
   ret->name = name;
   ret->type.val = Message::Type::kImu;
   return ret;
@@ -45,7 +43,7 @@ std::shared_ptr<datahub::Message> toNalioMessage(
   }
 
   ret->data = std::static_pointer_cast<Data>(point_cloud_data);
-  ret->header = toNalioHeader(point_cloud_msg->header);
+  toDatahubHeader(point_cloud_msg->header, &ret->header);
   ret->name = name;
   ret->type.val = Message::Type::kLidar;
   return ret;
