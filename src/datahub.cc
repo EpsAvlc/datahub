@@ -46,7 +46,7 @@ void DataBuffer::registerMessage(const std::string& message_name,
 }
 
 void DataBuffer::receiveMessage(const Message::Ptr& message) {
-  ReaderLockGuard lock(mutex_);
+  WriterLockGuard lock(mutex_);
   uint16_t message_id;
   if (!getMessageId(message->name, &message_id)) {
     ROS_ERROR_STREAM_FUNC("Message " << message->name
@@ -86,7 +86,8 @@ void DataBuffer::pruneBuffs() {
     if (send_report_) {
       for (size_t mi = 0; mi < message_buffs_.size(); ++mi) {
         ROS_INFO_STREAM(message_infos_[mi].name
-                        << ": restrict size  " << message_infos_[mi].buff_size
+                        << ": restrict size  " <<
+                        message_infos_[mi].buff_size
                         << ", real size  " << message_buffs_[mi].size());
       }
     }
@@ -96,12 +97,13 @@ void DataBuffer::pruneBuffs() {
       // ROS_INFO_STREAM("Enter msg for: " << message_infos_[mi].name
                                         // << " restrict: "
                                         // << message_infos_[mi].buff_size
-                                        // << " real: " << message_buffs_.size());
+                                        // << " real: " <<
+                                        // message_buffs_.size());
       if (message_infos_[mi].buff_size < message_buffs_[mi].size()) {
         std::string message_name = message_infos_[mi].name;
         auto new_begin_iter = message_buffs_[mi].begin();
         std::advance(new_begin_iter,
-                     message_buffs_.size() - message_infos_[mi].buff_size);
+                     message_buffs_[mi].size() - message_infos_[mi].buff_size - 1);
         for (int si = 0; si < data_syncers_.size(); ++si) {
           uint16_t syncer_message_id;
           if (!data_syncers_[si]->getMessageId(message_name,
@@ -112,7 +114,8 @@ void DataBuffer::pruneBuffs() {
                   ->header.timestamp < (*new_begin_iter)->header.timestamp) {
             continue;
           }
-          data_syncers_[si]->message_iters_[syncer_message_id] = new_begin_iter;
+          data_syncers_[si]->message_iters_[syncer_message_id] =
+          new_begin_iter;
         }
 
         message_buffs_[mi].erase(message_buffs_[mi].begin(), new_begin_iter);
@@ -247,10 +250,30 @@ bool DataSyncer::getSyncMessages(
       uint16_t buffer_msg_id = buffer_message_ids_.at(msg_id);
       DataBuffer::IteratorType search_end_it =
           buffer_->messageBuffEnd(buffer_msg_id);
+      if ((*search_begin_it)->header.timestamp.usec() < 0) {
+        DataBuffer::IteratorType search_first_it = ++search_begin_it;
+        if (search_first_it == search_end_it) {
+          return false;
+        }
+        ++message_iters_[msg_id];
+        return false;
+      }
+
+      if ((*search_begin_it)->header.timestamp.usec() > pivot_timestamp) {
+        // ROS_INFO_STREAM_FUNC("Skip a pivot msg");
+        ++message_iters_[0];
+        return false;
+      }
+
       std::vector<Message::Ptr> before_msgs;
       DataBuffer::IteratorType ret_iter = buffer_->getMessagesBefore(
           search_begin_it, search_end_it, pivot_timestamp, &before_msgs);
       if (ret_iter == search_end_it || before_msgs.size() == 0) {
+        // ROS_INFO_STREAM_FUNC("sync msg: "
+        //                      << message_infos_[mi].name << " failed."
+        //                      << (*search_begin_it)->header.timestamp.usec()
+        //                      << ", " << tr);
+
         return false;
       }
       new_iters[mi] = ret_iter;
@@ -336,10 +359,10 @@ DataBuffer::IteratorType DataBuffer::getMessagesBefore(
   before_msgs->clear();
   IteratorType ret = iter_end;
   for (auto iter = iter_begin; iter != iter_end; ++iter) {
-    if ((*iter)->header.timestamp < 0) {
+    if ((*iter)->header.timestamp.usec() < 0) {
       continue;
     }
-    if ((*iter)->header.timestamp < tr) {
+    if ((*iter)->header.timestamp.usec() < tr) {
       before_msgs->push_back(*iter);
       ret = iter;
     } else {
