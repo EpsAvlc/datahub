@@ -33,10 +33,10 @@ find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 
 catkin_package(
- INCLUDE_DIRS include ${PCL_INCLUDE_DIRS}
+ INCLUDE_DIRS include 
  LIBRARIES ${PROJECT_NAME}_lib
 #  CATKIN_DEPENDS roscpp rospy
- DEPENDS ${PCL_LIBRARIES}
+ DEPENDS 
 )
 
 include_directories(
@@ -49,13 +49,11 @@ include_directories(
 ######################## LIBS ####################
 add_library(${PROJECT_NAME}_lib
   src/datahub.cc
-  src/data_converter.cc
   src/log_utils.cc
   src/read_write_mutex.cc
 )
 target_link_libraries(${PROJECT_NAME}_lib
   ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
 )
 
 ####################### Tests ####################
