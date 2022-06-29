@@ -54,7 +54,7 @@ class DataSyncer {
   std::vector<DatahubCallback> callbacks_;
 
   DataBuffer* buffer_;
-  std::map<std::string, uint16_t> message_ids_;
+  std::map<std::string, uint16_t> syncer_message_ids_;
   std::vector<uint16_t> buffer_message_ids_;
   std::vector<MessageInfo> message_infos_;
   std::vector<std::list<Message::Ptr>::iterator> message_iters_;

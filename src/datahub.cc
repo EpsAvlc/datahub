@@ -83,43 +83,71 @@ bool DataBuffer::getMessageId(const std::string& message_name,
 
 void DataBuffer::pruneBuffs() {
   while (running_) {
-    if (send_report_) {
-      for (size_t mi = 0; mi < message_buffs_.size(); ++mi) {
-        ROS_INFO_STREAM(message_infos_[mi].name
-                        << ": restrict size  " <<
-                        message_infos_[mi].buff_size
-                        << ", real size  " << message_buffs_[mi].size());
-      }
-    }
+    // if (send_report_) {
+    //   for (size_t mi = 0; mi < message_buffs_.size(); ++mi) {
+    //     ROS_INFO_STREAM(message_infos_[mi].name
+    //                     << ": restrict size  " <<
+    //                     message_infos_[mi].buff_size
+    //                     << ", real size  " << message_buffs_[mi].size());
+    //   }
+    // }
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     WriterLockGuard lock(mutex_);
     for (int mi = 0; mi < message_buffs_.size(); ++mi) {
       // ROS_INFO_STREAM("Enter msg for: " << message_infos_[mi].name
-                                        // << " restrict: "
-                                        // << message_infos_[mi].buff_size
-                                        // << " real: " <<
-                                        // message_buffs_.size());
+      // << " restrict: "
+      // << message_infos_[mi].buff_size
+      // << " real: " <<
+      // message_buffs_.size());
       if (message_infos_[mi].buff_size < message_buffs_[mi].size()) {
+        if (send_report_) {
+          ROS_INFO_STREAM_FUNC("Enter prune if");
+        }
         std::string message_name = message_infos_[mi].name;
         auto new_begin_iter = message_buffs_[mi].begin();
-        std::advance(new_begin_iter,
-                     message_buffs_[mi].size() - message_infos_[mi].buff_size - 1);
+        std::advance(new_begin_iter, message_buffs_[mi].size() -
+                                         message_infos_[mi].buff_size - 1);
         for (int si = 0; si < data_syncers_.size(); ++si) {
           uint16_t syncer_message_id;
           if (!data_syncers_[si]->getMessageId(message_name,
                                                &syncer_message_id)) {
+            if (send_report_) {
+              ROS_INFO_STREAM_FUNC("Skip a syncer");
+            }
             continue;
           }
           if ((*data_syncers_[si]->message_iters_[syncer_message_id])
-                  ->header.timestamp < (*new_begin_iter)->header.timestamp) {
+                  ->header.timestamp > (*new_begin_iter)->header.timestamp) {
+            if (send_report_) {
+              ROS_INFO_STREAM_FUNC(
+                  "syner iter time: "
+                  << (*data_syncers_[si]->message_iters_[syncer_message_id])
+                         ->header.timestamp.sec()
+                  << ", new iter timestamp"
+                  << (*new_begin_iter)->header.timestamp.sec());
+            }
             continue;
           }
-          data_syncers_[si]->message_iters_[syncer_message_id] =
-          new_begin_iter;
+          data_syncers_[si]->message_iters_[syncer_message_id] = new_begin_iter;
+          if (send_report_) {
+            ROS_INFO_STREAM_FUNC(
+                "New iter pointer address: " << new_begin_iter->get());
+          }
         }
 
         message_buffs_[mi].erase(message_buffs_[mi].begin(), new_begin_iter);
       }
+
+      // if (send_report_) {
+      //   for (size_t mi = 0; mi < message_buffs_.size(); ++mi) {
+      //     ROS_INFO_STREAM_FUNC("after erase: "
+      //                          << message_infos_[mi].name << ": restrict size
+      //                          "
+      //                          << message_infos_[mi].buff_size
+      //                          << ", real size  " <<
+      //                          message_buffs_[mi].size());
+      //   }
+      // }
     }
   }
 }
@@ -155,6 +183,7 @@ DataSyncer::DataSyncer(const std::vector<std::string>& message_names,
     message_infos_.emplace_back(info);
     message_iters_.emplace_back(
         buffer_->message_buffs_[buffer_message_id].begin());
+    syncer_message_ids_.insert(std::make_pair(info.name, info.id));
   }
   sync_thread_ = std::thread(&DataSyncer::syncThread, this);
 }
@@ -294,10 +323,10 @@ bool DataSyncer::getSyncMessages(
 
 bool DataSyncer::getMessageId(const std::string& message_name,
                               uint16_t* message_id) {
-  if (message_ids_.find(message_name) == message_ids_.end()) {
+  if (syncer_message_ids_.find(message_name) == syncer_message_ids_.end()) {
     return false;
   } else {
-    *message_id = message_ids_.at(message_name);
+    *message_id = syncer_message_ids_.at(message_name);
     return true;
   }
 }
