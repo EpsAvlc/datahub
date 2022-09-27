@@ -16,7 +16,7 @@ class TimeStamp {
 
   void operator=(const double us) { us_ = us; }
 
-  double sec() { return us_ / 1000000.; }
+  double sec() { return static_cast<double>(us_) * 1e-6; }
 
   int64_t usec() { return us_; }
 
