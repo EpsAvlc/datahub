@@ -16,9 +16,9 @@ class TimeStamp {
 
   void operator=(const double us) { us_ = us; }
 
-  double sec() { return us_ / 1000000.; }
+  double sec() const { return us_ / 1000000.; }
 
-  int64_t usec() { return us_; }
+  int64_t usec() const { return us_; }
 
   bool operator<(const TimeStamp& rhs) { return us_ < rhs.us_; }
 

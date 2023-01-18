@@ -1,17 +1,21 @@
 #ifndef NALIO_DATA_DATAHUB_HH__
 #define NALIO_DATA_DATAHUB_HH__
 
+#include <condition_variable>
 #include <list>
 #include <map>
+#include <mutex>
 #include <string>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
 
 #include "datahub/message.hh"
 #include "datahub/read_write_mutex.hh"
 
 namespace datahub {
+
+struct DatahubConfig {
+  bool print_log = false;
+};
 
 using DatahubCallback =
     std::function<void(const std::vector<std::vector<Message::Ptr>>&)>;
@@ -31,7 +35,7 @@ class DataSyncer {
 
   DataSyncer(const std::vector<std::string>& message_names,
              const std::vector<SyncType> sync_types, DataBuffer* buffer);
-  
+
   ~DataSyncer();
 
   bool getSyncMessages(std::vector<std::vector<Message::Ptr>>* synced_messages,
@@ -69,7 +73,8 @@ class DataBuffer {
 
  public:
   using IteratorType = std::list<Message::Ptr>::iterator;
-  DataBuffer();
+  using Ptr = std::shared_ptr<DataBuffer>;
+  DataBuffer(const DatahubConfig& config = DatahubConfig());
   ~DataBuffer();
 
   DataSyncer::Ptr createDataSyncer(
@@ -80,7 +85,6 @@ class DataBuffer {
                        const size_t buffer_size);
 
   void receiveMessage(const Message::Ptr& message);
-
 
   bool getMessageId(const std::string& message_name, uint16_t* message_id);
 
@@ -98,6 +102,8 @@ class DataBuffer {
                                  std::vector<Message::Ptr>* synced_msgs);
 
  private:
+  const DatahubConfig& config() const { return config_; }
+
   struct MessageInfo {
     uint16_t id;
     std::string name;
@@ -110,8 +116,8 @@ class DataBuffer {
   std::vector<DataSyncer::Ptr> data_syncers_;
   std::thread prune_buffs_thread_;
   ReadWriteMutex mutex_;
+  DatahubConfig config_;
   bool running_;
-  bool send_report_;
 };
 
 }  // namespace datahub
