@@ -12,9 +12,6 @@ namespace datahub {
 class TimeStamp {
  public:
   TimeStamp() {}
-  TimeStamp(int64_t us) : us_(us) {}
-
-  void operator=(const double us) { us_ = us; }
 
   double sec() const { return us_ / 1000000.; }
 
@@ -23,6 +20,10 @@ class TimeStamp {
   bool operator<(const TimeStamp& rhs) { return us_ < rhs.us_; }
 
   bool operator>(const TimeStamp& rhs) { return us_ > rhs.us_; }
+
+  void fromSec(const double s) { us_ = s * 1e6; }
+
+  void fromUSec(const int64_t us) { us_ = us; }
 
  private:
   // time stamp in micro seconds

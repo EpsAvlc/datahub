@@ -40,7 +40,7 @@ void DataBuffer::registerMessage(const std::string& message_name,
   message_buffs_.emplace_back(std::list<Message::Ptr>());
   Message::Ptr tmp_msg(new Message);
   tmp_msg->name = message_name;
-  tmp_msg->header.timestamp = -1;
+  tmp_msg->header.timestamp.fromUSec(-1);
   // To make message_buffs[x].begin() != message_buffs[x].end()
   message_buffs_.back().emplace_back(tmp_msg);
 }
@@ -263,7 +263,7 @@ bool DataSyncer::getSyncMessages(
       } else {
         // skip head node.
         if (buffer_->message_buffs_[buffer_message_ids_[mi]].size() > 1 &&
-            (*message_iters_[mi])->header.timestamp < 0) {
+            (*message_iters_[mi])->header.timestamp.sec() < 0) {
           ++message_iters_[mi];
         }
         // increate pivot iterator to make it between two other msgs.
@@ -273,8 +273,8 @@ bool DataSyncer::getSyncMessages(
         }
         size_t lhs_ind = 0;
         for (; lhs_ind < between_msgs.size() - 1; ++lhs_ind) {
-          if (between_msgs[lhs_ind]->header.timestamp < pivot_timestamp &&
-              between_msgs[lhs_ind + 1]->header.timestamp > pivot_timestamp) {
+          if (between_msgs[lhs_ind]->header.timestamp.usec() < pivot_timestamp &&
+              between_msgs[lhs_ind + 1]->header.timestamp.usec() > pivot_timestamp) {
             break;
           }
         }
@@ -376,13 +376,13 @@ DataBuffer::IteratorType DataBuffer::getMessagesBetween(
   }
   synced_msgs->clear();
   for (auto mit = iter_begin; mit != iter_end; ++mit) {
-    if ((*mit)->header.timestamp > tl && (*mit)->header.timestamp < tr) {
+    if ((*mit)->header.timestamp.usec() > tl && (*mit)->header.timestamp.usec() < tr) {
       if (ret == iter_end) {
         ret = mit;
       }
       synced_msgs->push_back(*mit);
     }
-    if ((*mit)->header.timestamp > tr) {
+    if ((*mit)->header.timestamp.usec() > tr) {
       break;
     }
   }
